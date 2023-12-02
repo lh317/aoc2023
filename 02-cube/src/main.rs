@@ -1,53 +1,71 @@
 use std::fs;
-use std::io;
 
 use eyre::eyre;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 struct Rolls {
-    red: Option<i32>,
-    green: Option<i32>,
-    blue: Option<i32>
+    red: i32,
+    green: i32,
+    blue: i32,
 }
 
 impl Rolls {
-    fn new() -> Self {
-        Self { red: None, green: None, blue: None }
-    }
-
-    fn update(self, color: &str, num: i32) -> eyre::Result<Self> {
-        match color {
-            "red" => Ok(Self {red: Some(num), green: self.green, blue: self.blue}),
-            "green" => Ok(Self {red: self.red, green: Some(num), blue: self.blue}),
-            "blue" => Ok(Self {red: self.red, green: self.green, blue: Some(num)}),
-            _ => Err(eyre!("unknown color {}", color)),
+    fn new(red: i32, green: i32, blue: i32) -> Self {
+        Self {
+            red,
+            green,
+            blue,
         }
     }
 
     fn keep_max_color(&mut self, rhs: &Self) {
-        self.red = match (self.red, rhs.red) {
-            (Some(lhs), Some(rhs)) => Some(std::cmp::max(lhs, rhs)),
-            (None, Some(rhs)) => Some(rhs),
-            (Some(lhs), None) => Some(lhs),
-            _ => None
-        };
-        self.green = match (self.green, rhs.green) {
-            (Some(lhs), Some(rhs)) => Some(std::cmp::max(lhs, rhs)),
-            (None, Some(rhs)) => Some(rhs),
-            (Some(lhs), None) => Some(lhs),
-            _ => None
-        };
-        self.blue = match (self.blue, rhs.blue) {
-            (Some(lhs), Some(rhs)) => Some(std::cmp::max(lhs, rhs)),
-            (None, Some(rhs)) => Some(rhs),
-            (Some(lhs), None) => Some(lhs),
-            _ => None
-        };
+        self.red = std::cmp::max(self.red, rhs.red);
+        self.green = std::cmp::max(self.green, rhs.green);
+        self.blue = std::cmp::max(self.blue, rhs.blue);
     }
 
-    fn power(&self) -> i32 { self.red.unwrap_or(0) * self.green.unwrap_or(0) * self.blue.unwrap_or(0) }
+    fn power(&self) -> i32 {
+        self.red * self.green * self.blue
+    }
 
-    fn valid(&self) -> bool { self.red.unwrap_or(0) <= 12 && self.green.unwrap_or(0) <= 13 && self.blue.unwrap_or(0) <= 14 }
+    fn valid(&self) -> bool {
+        self.red <= 12 && self.green <= 13 && self.blue <= 14
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct RollsBuilder {
+    red: Option<i32>,
+    green: Option<i32>,
+    blue: Option<i32>,
+}
+
+impl RollsBuilder {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn add_color(&mut self, color: &str, num: i32) -> eyre::Result<()> {
+        match color {
+            "red" => {
+                self.red = Some(num);
+                Ok(())
+            }
+            "green" => {
+                self.green = Some(num);
+                Ok(())
+            }
+            "blue" => {
+                self.blue = Some(num);
+                Ok(())
+            }
+            _ => Err(eyre!("unknown color {}", color)),
+        }
+    }
+
+    fn build(self) -> Rolls {
+        Rolls::new(self.red.unwrap_or(0), self.green.unwrap_or(0), self.blue.unwrap_or(0))
+    }
 }
 
 fn main() -> eyre::Result<()> {
@@ -57,17 +75,25 @@ fn main() -> eyre::Result<()> {
     let mut sum = 0i32;
     let mut power_sum = 0i32;
     for (lineno, line) in body.lines().enumerate() {
-        let mut max_rolls = Rolls::new();
+        let mut max_rolls = Rolls::default();
         let mut valid = true;
-        let (id_str, shows) = line.split_once(":").ok_or_else(|| eyre!("{}:{}: invalid line", fname, lineno+1))?;
+        let (id_str, shows) =
+            line.split_once(':').ok_or_else(|| eyre!("{}:{}: invalid line", fname, lineno + 1))?;
         let id: i32 = id_str[5..].parse()?;
-        for show in shows.split(";") {
-            let mut rolls = Rolls::new();
-            for dice in show.split(",") {
-                let (num_str, color) = dice.trim().split_once(" ").ok_or(eyre!("{}: {}: invalid line", line, lineno + 1))?;
-                let num: i32 = num_str.parse().map_err(|_| eyre!("{}: {}: could not parse '{}'", fname, lineno + 1, num_str))?;
-                rolls = rolls.update(color, num)?;
+        for show in shows.split(';') {
+            let mut builder = RollsBuilder::new();
+            for dice in show.split(',') {
+                let (num_str, color) = dice.trim().split_once(' ').ok_or(eyre!(
+                    "{}: {}: invalid line",
+                    line,
+                    lineno + 1
+                ))?;
+                let num: i32 = num_str.parse().map_err(|_| {
+                    eyre!("{}: {}: could not parse '{}'", fname, lineno + 1, num_str)
+                })?;
+                builder.add_color(color, num)?;
             }
+            let rolls = builder.build();
             max_rolls.keep_max_color(&rolls);
             valid = valid && rolls.valid();
         }
