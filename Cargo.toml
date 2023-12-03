@@ -2,5 +2,6 @@
 resolver = "2"
 members = [
     "01-trebuchet",
-    "02-cube"
+    "02-cube",
+    "03-gears",
 ]
