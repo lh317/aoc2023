@@ -20,8 +20,10 @@ fn main() -> Result<()> {
     }
     let schematic = Array2::from_shape_vec((rows, columns), values)?;
     let mut sum = 0u32;
+    let mut gear_sum = 0u32;
     for ((row, col), c) in schematic.indexed_iter() {
         if !c.is_ascii_digit() && *c != '.' {
+            let mut nums = Vec::new();
             let left_count = schematic
                 .slice(s!(row,..col;-1))
                 .into_iter()
@@ -30,7 +32,7 @@ fn main() -> Result<()> {
             let left_num: String =
                 schematic.slice(s!(row, (col - left_count)..col)).into_iter().collect();
             if !left_num.is_empty() {
-                sum += left_num.parse::<u32>()?;
+                nums.push(left_num.parse::<u32>()?);
             }
             if col < columns - 1 {
                 let right_num: String = schematic
@@ -39,7 +41,7 @@ fn main() -> Result<()> {
                     .take_while(|c| c.is_ascii_digit())
                     .collect();
                 if !right_num.is_empty() {
-                    sum += right_num.parse::<u32>()?;
+                    nums.push(right_num.parse::<u32>()?);
                 }
             }
             if row > 0 {
@@ -72,10 +74,10 @@ fn main() -> Result<()> {
                     topleft_num.push_str(top_num.as_str());
                     topleft_num.push_str(topright_num.as_str());
                 } else if !topright_num.is_empty() {
-                        sum += topright_num.parse::<u32>()?;
+                        nums.push(topright_num.parse::<u32>()?);
                 }
                 if !topleft_num.is_empty() {
-                    sum += topleft_num.parse::<u32>()?;
+                    nums.push(topleft_num.parse::<u32>()?);
                 }
             }
             if row < rows - 1 {
@@ -108,14 +110,19 @@ fn main() -> Result<()> {
                     topleft_num.push_str(top_num.as_str());
                     topleft_num.push_str(topright_num.as_str());
                 } else if !topright_num.is_empty() {
-                        sum += topright_num.parse::<u32>()?;
+                        nums.push(topright_num.parse::<u32>()?);
                 }
                 if !topleft_num.is_empty() {
-                    sum += topleft_num.parse::<u32>()?;
+                    nums.push(topleft_num.parse::<u32>()?);
                 }
+            }
+            sum += nums.iter().sum::<u32>();
+            if *c == '*' && nums.len() == 2 {
+                gear_sum += nums.iter().product::<u32>();
             }
         }
     }
     println!("{}", sum);
+    println!("{}", gear_sum);
     Ok(())
 }
