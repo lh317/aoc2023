@@ -1,6 +1,7 @@
 use eyre::eyre;
 use std::collections::HashSet;
 use std::fs;
+use std::num::ParseIntError;
 
 fn main() -> eyre::Result<()> {
     let mut args = std::env::args();
@@ -20,15 +21,14 @@ fn main() -> eyre::Result<()> {
                 eyre!("{}:{}: {} parsing winner '{}'", fname, lineno + 1, e, token)
             })?);
         }
-        let mut wins = 0u32;
-        for token in scratch_str.split_whitespace() {
-            let num = token.parse::<u32>().map_err(|e| {
-                eyre!("{}:{}: {} parsing scratch '{}'", fname, lineno + 1, e, token)
-            })?;
-            if winners.contains(&num) {
-                wins += 1;
+        let wins = scratch_str.split_whitespace().map(|t| {
+            let n: u32 = t.parse()?;
+            if winners.contains(&n) {
+                Ok(1)
+            } else {
+                Ok(0)
             }
-        }
+        }).sum::<Result<u32, ParseIntError>>()?;
         card_wins.push(wins);
         if wins > 0 {
             sum += 1 << (wins - 1);
