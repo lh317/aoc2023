@@ -125,6 +125,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "soilmap"
+version = "0.1.0"
+dependencies = [
+ "eyre",
+]
+
+[[package]]
 name = "trebuchet"
 version = "0.1.0"
 dependencies = [
