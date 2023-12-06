@@ -2,6 +2,7 @@ use std::fs;
 use std::str::FromStr;
 
 use eyre::{eyre, Report, Result, WrapErr};
+use rayon::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct Map {
@@ -107,8 +108,19 @@ fn main() -> Result<()> {
         let light = lookup(&water_light, water);
         let temp = lookup(&light_temp, light);
         let humidity = lookup(&temp_humidity, temp);
-        lookup(&humidity_location, humidity)
+        (lookup(&humidity_location, humidity), *s)
     }).min().ok_or(eyre!("minimum not found"))?;
-    println!("{}", min_location);
+    println!("{:?}", min_location);
+    let min_location2 = seeds.chunks_exact(2).flat_map(|c| c[0]..c[0]+c[1]).par_bridge().map(|s| {
+        let soil = lookup(&seed_soil, s);
+        let fert = lookup(&soil_fertilizer, soil);
+        let water = lookup(&fertilizer_water, fert);
+        let light = lookup(&water_light, water);
+        let temp = lookup(&light_temp, light);
+        let humidity = lookup(&temp_humidity, temp);
+        lookup(&humidity_location, humidity)
+    }).min().ok_or(eyre!("minimum location 2 not found"))?;
+    println!("{}", min_location2);
+
     Ok(())
 }
