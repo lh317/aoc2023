@@ -6,4 +6,5 @@ members = [
     "03-gears",
     "04-scratchcards",
     "05-soilmap",
+    "06-race",
 ]
