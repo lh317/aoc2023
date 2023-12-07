@@ -56,12 +56,12 @@ enum HandKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct Hand {
+struct Hand<T> {
     kind: HandKind,
-    cards: Vec<Card>
+    cards: Vec<T>
 }
 
-impl FromStr for Hand {
+impl FromStr for Hand<Card> {
     type Err = Report;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -134,13 +134,7 @@ impl FromStr for JokerCard {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct JokerHand {
-    kind: HandKind,
-    cards: Vec<JokerCard>
-}
-
-impl FromStr for JokerHand {
+impl FromStr for Hand<JokerCard> {
     type Err = Report;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -195,7 +189,7 @@ impl FromStr for JokerHand {
             },
             _ => panic!("logic error")
         };
-        Ok(JokerHand { kind, cards} )
+        Ok(Hand { kind, cards} )
     }
 }
 
@@ -203,13 +197,13 @@ fn main() -> Result<()> {
     let mut args = std::env::args();
     let fname = args.nth(1).ok_or(eyre!("filename was not provided"))?;
     let body = fs::read_to_string(fname.clone())?;
-    let mut lines = body.lines();
+    let lines = body.lines();
     let mut rankings = BTreeMap::new();
     let mut joker_rankings = BTreeMap::new();
     for (lineno, line) in lines.enumerate() {
         let (hand_str, ranking_str) = line.split_once(' ').ok_or(eyre!("{}:{}: no split", fname, lineno+1))?;
-        let hand: Hand = hand_str.parse()?;
-        let joker_hand = hand_str.parse::<JokerHand>()?;
+        let hand = hand_str.parse::<Hand<Card>>()?;
+        let joker_hand = hand_str.parse::<Hand<JokerCard>>()?;
         let ranking: u32 = ranking_str.parse()?;
         rankings.insert(hand, ranking);
         joker_rankings.insert(joker_hand, ranking);

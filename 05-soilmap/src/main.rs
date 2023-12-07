@@ -1,7 +1,7 @@
 use std::fs;
 use std::str::FromStr;
 
-use eyre::{eyre, Report, Result, WrapErr};
+use eyre::{eyre, Result, WrapErr};
 use rayon::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
