@@ -8,4 +8,5 @@ members = [
     "05-soilmap",
     "06-race",
     "07-camel",
+    "08-wasteland",
 ]
