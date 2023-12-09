@@ -9,4 +9,5 @@ members = [
     "06-race",
     "07-camel",
     "08-wasteland",
+    "09-mirage"
 ]
