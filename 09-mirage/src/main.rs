@@ -1,4 +1,4 @@
-use eyre::{eyre, Report, Result, WrapErr};
+use eyre::{eyre, Result};
 use std::fs;
 
 fn main() -> Result<()> {
