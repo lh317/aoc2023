@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::str::FromStr;
 
@@ -25,6 +25,12 @@ enum Pipe {
     Ground
 }
 
+impl Pipe {
+    fn is_up(&self) -> bool {
+        matches!(self, Pipe::NorthSouth | Pipe::NorthEast | Pipe::NorthWest)
+    }
+}
+
 impl FromStr for Pipe {
     type Err = Report;
 
@@ -43,7 +49,7 @@ impl FromStr for Pipe {
     }
 }
 
-fn connected_start(map: ArrayView2<Pipe>, start: [usize; 2]) -> Option<[[usize; 2]; 2]> {
+fn from_start(map: ArrayView2<Pipe>, start: [usize; 2]) -> Option<Pipe> {
     let [row, col] = start;
     let above = map.get([row.saturating_sub(1), col]);
     let below = map.get([row +1, col]);
@@ -68,11 +74,12 @@ fn connected_start(map: ArrayView2<Pipe>, start: [usize; 2]) -> Option<[[usize; 
     }
     if solve.len() == 2 {
         match (solve[0], solve[1]) {
-            (Direction::North, Direction::South) => Some([[row-1, col], [row+1, col]]),
-            (Direction::North, Direction::West) => Some([[row-1, col], [row, col-1]]),
-            (Direction::North, Direction::East) => Some([[row-1, col], [row, col+1]]),
-            (Direction::South, Direction::West) => Some([[row+1, col], [row, col-1]]),
-            (Direction::South, Direction::East) => Some([[row+1, col], [row, col+1]]),
+            (Direction::North, Direction::South) => Some(Pipe::NorthSouth),
+            (Direction::North, Direction::West) => Some(Pipe::NorthWest),
+            (Direction::North, Direction::East) => Some(Pipe::NorthEast),
+            (Direction::South, Direction::West) => Some(Pipe::SouthWest),
+            (Direction::South, Direction::East) => Some(Pipe::SouthEast),
+            (Direction::West, Direction::East) => Some(Pipe::EastWest),
             _ => None
         }
     } else {
@@ -105,10 +112,11 @@ fn main() -> Result<()> {
             bail!("{}:{}: expected {} columns got {}", fname, rows, columns, line.len());
         }
     }
-    let map = Array2::from_shape_vec((rows, columns), values)?;
-    let mut edges = HashMap::from([(start, 0)]);
-    let mut stack = VecDeque::from([(0usize, start)]);
-    while let Some((d, [row, col])) = stack.pop_front() {
+    let mut map = Array2::from_shape_vec((rows, columns), values)?;
+    map[start] = from_start(map.view(), start).ok_or_else(|| eyre!("invalid start"))?;
+    let mut edges = HashSet::from([start]);
+    let mut stack = VecDeque::from([start]);
+    while let Some([row, col]) = stack.pop_front() {
         let next = match map.get([row, col]) {
             None => bail!("invalid index: ({}, {})", row, col),
             Some(&Pipe::Ground) => bail!("index ({},{}) is ground!", row, col),
@@ -118,15 +126,33 @@ fn main() -> Result<()> {
             Some(&Pipe::NorthWest) => [[row.saturating_sub(1), col], [row, col.saturating_sub(1)]],
             Some(&Pipe::SouthWest) => [[row+1, col], [row, col.saturating_sub(1)]],
             Some(&Pipe::SouthEast) => [[row+1, col], [row, col + 1]],
-            Some(Pipe::Start) => connected_start(map.view(), [row, col]).ok_or_else(|| eyre!("invalid start ({}, {})", row, col))?,
+            _ => bail!("index ({}, {}) is still start!", row, col),
         };
         for pos in next.into_iter() {
-            edges.entry(pos).or_insert_with(|| {
-                stack.push_back((d+1, pos));
-                d + 1
-            });
+            if !edges.contains(&pos) {
+                stack.push_back(pos);
+                edges.insert(pos);
+            };
         }
     }
-    println!("{}", edges.values().max().unwrap());
+    println!("{}", edges.len() / 2);
+    let mut inside = 0usize;
+    // A point is inside a closed shape if a ray in any direction crosses an odd
+    // number of times.
+    // Trick: Need to only count up or down, not both, when casting left -> right.
+    for row in 0..rows {
+        for col in 0..columns {
+            if !edges.contains(&[row, col]) {
+                let crossings = (0..col).filter(|&c| match edges.get(&[row, c]) {
+                    Some(pos) => map[*pos].is_up(),
+                    None => false
+                }).count();
+                if crossings & 1 == 1 {
+                    inside += 1;
+                }
+            }
+        }
+    }
+    println!("{}", inside);
     Ok(())
 }
