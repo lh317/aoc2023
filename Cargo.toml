@@ -11,4 +11,5 @@ members = [
     "08-wasteland",
     "09-mirage",
     "10-pipemaze",
+    "11-galaxies",
 ]
