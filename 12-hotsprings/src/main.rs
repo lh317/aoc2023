@@ -1,3 +1,6 @@
+use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::fmt;
 use std::str::FromStr;
 
 use eyre::{eyre, Report, Result, WrapErr};
@@ -19,6 +22,16 @@ impl FromStr for Spring {
             "#" => Ok(Spring::Broken),
             "?" => Ok(Spring::Unknown),
             _ => Err(eyre!("unknown spring '{s}'")),
+        }
+    }
+}
+
+impl fmt::Display for Spring {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Spring::Working => write!(f, "."),
+            Spring::Broken => write!(f, "#"),
+            Spring::Unknown => write!(f, "?"),
         }
     }
 }
@@ -82,11 +95,74 @@ impl Record {
         let springs_len = self.springs.len();
         let broken_len = self.broken_runs.len();
         for _ in 0..n {
-            self.springs.extend_from_within(0..springs_len);
             self.springs.push(Spring::Unknown);
+            self.springs.extend_from_within(0..springs_len);
             self.broken_runs.extend_from_within(0..broken_len);
         }
-        self.springs.pop();
+    }
+
+    fn possible_solutions_inner(&self,
+        cache: &mut HashMap<(usize, usize, bool), usize>,
+        index: usize,
+        broken_index: usize,
+        force_working: bool
+    ) -> usize {
+        cache.get(&(index, broken_index,force_working)).copied().unwrap_or_else(|| {
+            let possible = match (index.cmp(&self.springs.len()), broken_index.cmp(&self.broken_runs.len())) {
+                (Ordering::Equal, Ordering::Less) => 0,
+                (Ordering::Equal, Ordering::Equal) => 1,
+                (Ordering::Less, Ordering::Equal) => if self.springs[index..].iter().all(|s| matches!(s, Spring::Working|Spring::Unknown)) {
+                    1
+                } else { 0 },
+                (Ordering::Less, Ordering::Less) => match self.springs[index] {
+                    Spring::Working => {
+                        let remaining = &self.springs[index..];
+                        let next = index + remaining.iter().position(|s| matches!(s, Spring::Broken|Spring::Unknown)).unwrap_or(remaining.len());
+                        self.possible_solutions_inner(cache, next, broken_index, false)
+                    },
+                    Spring::Broken => {
+                        if !force_working {
+                            let needed = self.broken_runs[broken_index];
+                            let remaining = &self.springs[index..];
+                            let found = remaining.iter().take(needed).filter(|s| matches!(s, Spring::Broken|Spring::Unknown)).count();
+                            if found == needed {
+                                self.possible_solutions_inner(cache, index+needed, broken_index+1, true)
+                            } else {
+                                0
+                            }
+                        } else {
+                            0
+                        }
+                    },
+                    Spring::Unknown => {
+                        let remaining = &self.springs[index..];
+                        let next = index + 1 + self.springs[index..].iter().skip(1).position(|s| matches!(s, Spring::Broken|Spring::Unknown)).unwrap_or(remaining.len() - 1);
+                        let working = self.possible_solutions_inner(cache, next, broken_index, false);  // treat as Working
+                        let broken = if !force_working {
+                            let needed = self.broken_runs[broken_index];
+                            let found = remaining.iter().take(needed).filter(|s| matches!(s, Spring::Broken|Spring::Unknown)).count();
+                            if found == needed {
+                                self.possible_solutions_inner(cache, index+needed, broken_index+1, true)
+                            } else {
+                                0
+                            }
+                        } else {
+                            0
+                        };
+                        working + broken
+                    },
+
+                },
+                _ => panic!("logic error at {index} of {}, {broken_index} of {}", self.springs.len(), self.broken_runs.len()),
+            };
+            cache.insert((index, broken_index, force_working), possible);
+            possible
+        })
+    }
+    fn possible_solutions(&self) -> usize {
+        let mut cache = HashMap::new();
+        let index = self.springs.iter().position(|s| matches!(s, Spring::Unknown|Spring::Broken)).unwrap_or(self.springs.len());
+        self.possible_solutions_inner(&mut cache, index, 0, false)
     }
 
 }
@@ -110,11 +186,24 @@ impl FromStr for Record {
     }
 }
 
+impl fmt::Display for Record {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for s in self.springs.iter() {
+            write!(f, "{s}")?;
+        }
+        write!(f, " ")?;
+        for r in self.broken_runs.iter() {
+            write!(f, "{r},")?;
+        }
+        Ok(())
+    }
+}
+
 fn main() -> Result<()> {
     let mut args = std::env::args();
     let fname = args.nth(1).ok_or_else(|| eyre!("filename was not provided"))?;
     let body = std::fs::read_to_string(fname.as_str())?;
-    let records: Vec<Record> = body
+    let mut records: Vec<Record> = body
         .lines()
         .enumerate()
         .map(|(lineno, l)| l.parse().wrap_err_with(|| format!("{}:{}", fname, lineno + 1)))
@@ -135,5 +224,10 @@ fn main() -> Result<()> {
         }).sum::<Result<usize>>()?;
     }
     println!("{sum}");
+    let sum2: usize = records.iter_mut().map(|r| {
+        r.grow(4);
+        r.possible_solutions()
+    }).sum();
+    println!("{sum2}");
     Ok(())
 }
