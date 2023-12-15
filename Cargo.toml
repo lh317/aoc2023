@@ -13,4 +13,5 @@ members = [
     "10-pipemaze",
     "11-galaxies",
     "12-hotsprings",
+    "13-mirrors",
 ]
