@@ -375,6 +375,7 @@ name = "rocks"
 version = "0.1.0"
 dependencies = [
  "eyre",
+ "indexmap",
  "ndarray",
 ]
 
