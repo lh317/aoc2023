@@ -14,5 +14,6 @@ members = [
     "11-galaxies",
     "12-hotsprings",
     "13-mirrors",
-    "14-rocks"
+    "14-rocks",
+    "15-lens",
 ]
