@@ -16,4 +16,5 @@ members = [
     "13-mirrors",
     "14-rocks",
     "15-lens",
+    "16-lava",
 ]

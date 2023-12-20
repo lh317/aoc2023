@@ -161,6 +161,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lava"
+version = "0.1.0"
+dependencies = [
+ "eyre",
+ "ndarray",
+]
+
+[[package]]
 name = "lens"
 version = "0.1.0"
 dependencies = [
