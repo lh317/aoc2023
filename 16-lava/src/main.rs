@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use eyre::{bail, eyre, Report, Result, WrapErr};
-use ndarray::{Array2, Data, ArrayBase, Ix2, s};
+use ndarray::{s, Array2, ArrayBase, Data, Ix2};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Entry {
@@ -9,7 +9,7 @@ enum Entry {
     MirrorLeftUp,
     MirrorLeftDown,
     SplitHoriz,
-    SplitVert
+    SplitVert,
 }
 
 impl TryFrom<char> for Entry {
@@ -22,12 +22,12 @@ impl TryFrom<char> for Entry {
             '\\' => Ok(Entry::MirrorLeftDown),
             '-' => Ok(Entry::SplitHoriz),
             '|' => Ok(Entry::SplitVert),
-            _ => Err(eyre!("unknown entry '{c}'"))
+            _ => Err(eyre!("unknown entry '{c}'")),
         }
     }
 }
 
-fn parse_array<'a, I: Iterator<Item=&'a str>>(lines: I) -> Result<Array2<Entry>> {
+fn parse_array<'a, I: Iterator<Item = &'a str>>(lines: I) -> Result<Array2<Entry>> {
     let mut rows = 0usize;
     let mut columns = 0usize;
     let mut values = Vec::new();
@@ -52,24 +52,29 @@ enum Direction {
     Up,
     Down,
     Left,
-    Right
+    Right,
 }
 
-fn part1<D: Data<Elem=Entry>>(array: &ArrayBase<D, Ix2>) -> usize {
+fn occupy<D: Data<Elem = Entry>>(
+    array: &ArrayBase<D, Ix2>,
+    start: [isize; 2],
+    dir: Direction,
+) -> usize {
     let mut occupied = Array2::<bool>::default(array.dim());
     let mut cast = HashSet::new();
-    let mut rays = vec![([0isize, -1], Direction::Right)];
+    let mut rays = vec![(start, dir)];
     while let Some((ray, dir)) = rays.pop() {
         cast.insert((ray, dir));
-        let s= match dir {
-            Direction::Right => s![ray[0], ray[1]+1..],
-            Direction::Down => s![ray[0]+1.., ray[1]],
+        let s = match dir {
+            Direction::Right => s![ray[0], ray[1] + 1..],
+            Direction::Down => s![ray[0] + 1.., ray[1]],
             Direction::Left => s![ray[0], ..ray[1];-1],
-            Direction::Up => s![..ray[0];-1, ray[1]]
+            Direction::Up => s![..ray[0];-1, ray[1]],
         };
         let entry_slice = array.slice(s);
         let mut occupied_slice = occupied.slice_mut(s);
-        for (offset, (entry, occ)) in entry_slice.iter().zip(occupied_slice.iter_mut()).enumerate() {
+        for (offset, (entry, occ)) in entry_slice.iter().zip(occupied_slice.iter_mut()).enumerate()
+        {
             let offset = offset + 1;
             *occ = true;
             let offsets = [
@@ -95,12 +100,12 @@ fn part1<D: Data<Elem=Entry>>(array: &ArrayBase<D, Ix2>) -> usize {
                 (Direction::Up, Entry::MirrorLeftUp) => &offsets[7..8],
                 (Direction::Up, Entry::MirrorLeftDown) => &offsets[6..7],
                 (Direction::Up, Entry::SplitHoriz) => &offsets[6..8],
-                _ => &[][..]
+                _ => &[][..],
             };
             if !next.is_empty() {
                 for &(no, nd) in next {
                     let pos = [ray[0] + no[0], ray[1] + no[1]];
-                    if !cast.contains(&(pos,nd)) {
+                    if !cast.contains(&(pos, nd)) {
                         //println!("pushing {:?}", (pos, nd));
                         rays.push((pos, nd));
                     }
@@ -112,12 +117,23 @@ fn part1<D: Data<Elem=Entry>>(array: &ArrayBase<D, Ix2>) -> usize {
     occupied.into_iter().filter(|&e| e).count()
 }
 
-
 fn main() -> Result<()> {
     let mut args = std::env::args();
     let fname = args.nth(1).ok_or_else(|| eyre!("filename was not provided"))?;
     let body = std::fs::read_to_string(fname.as_str())?;
     let wall = parse_array(body.lines())?;
-    println!("{}", part1(&wall));
+    println!("{}", occupy(&wall, [0, -1], Direction::Right));
+    let (rows, cols) = wall.dim();
+    let rows_iter = (0..rows as isize).flat_map(|r| {
+        [
+            occupy(&wall, [r, -1], Direction::Right),
+            occupy(&wall, [r, cols as isize], Direction::Left),
+        ]
+    });
+    let cols_iter = (0..cols as isize).flat_map(|c| {
+        [occupy(&wall, [-1, c], Direction::Down), occupy(&wall, [rows as isize, c], Direction::Up)]
+    });
+    let max = rows_iter.chain(cols_iter).max().unwrap();
+    println!("{max}");
     Ok(())
 }
