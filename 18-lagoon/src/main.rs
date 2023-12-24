@@ -1,17 +1,33 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::str::FromStr;
 
 use eyre::{eyre, Report, Result, OptionExt, WrapErr};
-use itertools::Itertools;
 use ndarray::{Array2, s, DataMut, ArrayBase, Ix2};
-use rgb::RGB8;
+use rgb::{RGB,RGB8};
+
+trait Arrow {
+    fn dir(&self) -> Direction;
+    fn steps(&self) -> usize;
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Direction {
-    Up,
+    Right,
     Down,
     Left,
-    Right
+    Up
+}
+
+impl From<usize> for Direction {
+    fn from(value: usize) -> Self {
+        match value {
+            0 => Direction::Right,
+            1 => Direction::Down,
+            2 => Direction::Left,
+            3 => Direction::Up,
+            _ => panic!("not a valid direction"),
+        }
+    }
 }
 
 impl FromStr for Direction {
@@ -33,6 +49,11 @@ struct Dig {
     dir: Direction,
     steps: u8,
     color: RGB8
+}
+
+impl Arrow for Dig {
+    fn dir(&self) -> Direction { self.dir }
+    fn steps(&self) -> usize { usize::from(self.steps) }
 }
 
 impl FromStr for Dig {
@@ -68,15 +89,66 @@ fn flood_fill<T: Default, D: DataMut<Elem=Option<T>>>(
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct BigDig {
+    dir: Direction,
+    steps: usize,
+}
+
+impl Arrow for BigDig {
+    fn dir(&self) -> Direction { self.dir}
+    fn steps(&self) -> usize {self.steps}
+}
+
+impl From<Dig> for BigDig {
+    fn from(value: Dig) -> Self {
+        let color: RGB<usize> = RGB::new(value.color.r.into(), value.color.g.into(), value.color.b.into());
+        let steps = (color.r << 12) + (color.g << 4) + (color.b >> 4);
+        let dir = (color.b & 0x0F).into();
+        BigDig {dir, steps}
+    }
+}
+
+
+fn solve<A: Arrow>(digs: &[A]) -> usize {
+    let mut pos = [0isize; 2];
+    let mut vertices = vec![pos];
+    let mut perimeter = 0usize;
+    for dig in digs.iter() {
+        perimeter += dig.steps();
+        let steps = isize::try_from(dig.steps()).unwrap();
+        pos = match dig.dir() {
+            Direction::Up => [pos[0] - steps, pos[1]],
+            Direction::Down => [pos[0] + steps, pos[1]],
+            Direction::Left => [pos[0], pos[1] - steps],
+            Direction::Right => [pos[0], pos[1] + steps],
+        };
+        vertices.push(pos);
+    }
+    let mut area = 0.0f64;
+    for (v1, v2) in vertices.iter().zip(vertices.iter().cycle().skip(1)) {
+        let v1_x: f64 = v1[1] as f64;
+        let v1_y: f64 = v1[0] as f64;
+        let v2_x: f64 = v2[1] as f64;
+        let v2_y: f64 = v2[0] as f64;
+        area += v1_x * v2_y;
+        area -= v1_y * v2_x;
+    }
+    area /= 2.0;
+    (area + (perimeter as f64 / 2.0)) as usize + 1
+}
+
+
+
 fn main() -> Result<()> {
     let mut args = std::env::args();
     let fname = args.nth(1).ok_or_eyre("filename was not provided")?;
     let body = std::fs::read_to_string(fname.as_str())?;
     let digs: Vec<Dig> = body.lines().enumerate().map(|(lineno, l)| l.parse().wrap_err_with(|| format!("{}:{}", fname, lineno+1))).collect::<Result<_>>()?;
     let extents = digs.iter().fold([0usize; 4], |mut acc, d| {acc[d.dir as usize] += d.steps as usize; acc});
-    let rows = extents[2] + extents[3];
-    let cols = extents[0] + extents[1];
-    let mut pos = [extents[0], extents[2]];
+    let rows = extents[0] + extents[2];
+    let cols = extents[1] + extents[3];
+    let mut pos = [extents[3], extents[2]];
     let mut array = Array2::<Option<RGB8>>::default((rows, cols));
     let mut edges = HashMap::new();
     for (i, dig) in digs.iter().enumerate() {
@@ -101,7 +173,7 @@ fn main() -> Result<()> {
             _ => 0..0,
         };
         for row in range {
-            edges.entry(row).or_insert(Vec::new()).push(pos[1]);
+            edges.entry(row).or_insert_with(Vec::new).push(pos[1]);
         }
         match (dig.dir, digs[(i + 1) % digs.len()].dir) {
             (Direction::Left|Direction::Right, Direction::Up) => edges.entry(pos[0]).or_insert(Vec::new()).push(end[1]),
@@ -113,11 +185,8 @@ fn main() -> Result<()> {
     flood_fill(&mut array, &edges);
     let count: usize = array.iter().filter(|x| x.is_some()).count();
     println!("{count}");
-    // for row in 0..rows {
-    //     for col in 0..cols {
-    //         print!("{}", if array[[row, col]].is_some() { "#" } else {"."});
-    //     }
-    //     print!("\n")
-    // }
+    println!("{}", solve(&digs));
+    let bigdigs: Vec<BigDig> = digs.into_iter().map(BigDig::from).collect();
+    println!("{}", solve(&bigdigs));
     Ok(())
 }
