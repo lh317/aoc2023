@@ -12,6 +12,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "aplenty"
+version = "0.1.0"
+dependencies = [
+ "byteyarn",
+ "eyre",
+]
+
+[[package]]
 name = "array-init"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -28,6 +36,12 @@ name = "bytemuck"
 version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "374d28ec25809ee0e23827c2ab573d729e293f281dfe393500e7ad618baa61c6"
+
+[[package]]
+name = "byteyarn"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0542f67b39e2bfcec9f625cf3dcf9e621acb76e700352ab7f21e85036d5afc6"
 
 [[package]]
 name = "camel"
